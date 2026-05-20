@@ -51,9 +51,8 @@
     }
     .toolbar .title { font-size: 22px; font-weight: 700; color: #303133; margin-right: auto; }
     
-    /* 主内容区 - 三列 */
-    .main-content { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
-    @media (max-width: 1200px) { .main-content { grid-template-columns: 1fr 1fr; } }
+    /* 主内容区 - 自适应多列 */
+    .main-content { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
     @media (max-width: 800px) { .main-content { grid-template-columns: 1fr; } }
     
     /* 需求面板 */
@@ -386,6 +385,19 @@
             <button class="todo-copy-btn" @click="copyReq(item.req)" title="复制">📋</button>
           </div>
         </div>
+
+        <!-- 上报需求待提交 -->
+        <div class="todo-section" v-if="todoReport.length > 0">
+          <div class="todo-section-header" style="background:#fce4ec; color:#c62828;">📝 需提上报需求（{{ todoReport.length }}）</div>
+          <div class="todo-item" v-for="item in todoReport" :key="item.req.id">
+            <span class="todo-version">{{ item.version }}</span>
+            <span class="todo-req-title">
+              <a v-if="item.req.tapdUrl" :href="item.req.tapdUrl" target="_blank" rel="noopener">{{ item.req.title }}</a>
+              <span v-else>{{ item.req.title }}</span>
+            </span>
+            <button class="todo-copy-btn" @click="copyReq(item.req)" title="复制">📋</button>
+          </div>
+        </div>
       </div>
 
       <!-- 需求面板 -->
@@ -525,6 +537,45 @@
                   </div>
                   <div class="req-tags">
                     <span class="mini-tag design">需设计</span>
+                    <span v-if="req.needClient" class="mini-tag client">需客户端</span>
+                  </div>
+                </div>
+                <div class="actions">
+                  <button class="action-btn" @click="copyReq(req)" title="复制标题和链接">📋</button>
+                  <button v-if="isEditMode" class="action-btn" @click="editReq(req)" title="编辑">✏️</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 上报需求池 -->
+        <div class="panel">
+          <div class="panel-title">
+            📝 上报需求池
+            <span class="count">{{ reportRequirements.length }}</span>
+          </div>
+          <div v-if="reportRequirements.length === 0" class="empty-state">
+            <div class="icon">📭</div>
+            <div class="text">暂无上报需求</div>
+          </div>
+          <div v-for="group in reportGroups" :key="group.version" class="req-group">
+            <div class="req-group-header">
+              <span class="version-tag">{{ group.version || '未分配版本' }}</span>
+            </div>
+            <div>
+              <div v-for="(req, idx) in group.items" :key="req.id"
+                   class="req-card"
+                   :data-id="req.id">
+                <span class="seq-num">{{ idx + 1 }}</span>
+                <div class="info">
+                  <div class="req-title">
+                    <a v-if="req.tapdUrl" :href="req.tapdUrl" target="_blank" rel="noopener">{{ req.title }}</a>
+                    <span v-else>{{ req.title }}</span>
+                  </div>
+                  <div class="req-tags">
+                    <span class="mini-tag report">需上报</span>
+                    <span v-if="req.needDesign" class="mini-tag design">需设计</span>
                     <span v-if="req.needClient" class="mini-tag client">需客户端</span>
                   </div>
                 </div>
@@ -853,8 +904,25 @@
           return items;
         });
 
+        // 上报需求待提交：版本进入功能开发阶段前，needReport且状态还未上报的需求
+        const todoReport = computed(() => {
+          const items = [];
+          for (const ver of computedVersions.value) {
+            const phase = getCurrentPhaseForVersion(ver.name);
+            // 版本在设计或功能开发阶段时提醒上报
+            if (phase && (phase.includes('设计') || phase.includes('功能开发'))) {
+              const reqs = appData.value.requirements.filter(
+                r => r.needReport && r.targetVersion === ver.name && 
+                     r.status !== 'done' && r.status !== 'testing'
+              );
+              reqs.forEach(req => items.push({ req, version: ver.name }));
+            }
+          }
+          return items;
+        });
+
         const todoItems = computed(() => {
-          return [...todoDesign.value, ...todoReview.value, ...todoDev.value, ...todoData.value];
+          return [...todoDesign.value, ...todoReview.value, ...todoDev.value, ...todoData.value, ...todoReport.value];
         });
 
         // === 添加表单 ===
@@ -1004,6 +1072,7 @@
         const devRequirements = computed(() => appData.value.requirements.filter(r => r.type === 'dev'));
         const dataRequirements = computed(() => appData.value.requirements.filter(r => r.type === 'data'));
         const designRequirements = computed(() => appData.value.requirements.filter(r => r.needDesign));
+        const reportRequirements = computed(() => appData.value.requirements.filter(r => r.needReport));
 
         // 开发需求筛选
         const filteredDevRequirements = computed(() => {
@@ -1069,6 +1138,23 @@
               }
             }
             return { version: v, items, designDeadline };
+          });
+        });
+
+        // 上报需求池分组（按版本）
+        const reportGroups = computed(() => {
+          const reqs = reportRequirements.value;
+          const versions = [...new Set(reqs.map(r => r.targetVersion || ''))];
+          versions.sort((a, b) => {
+            if (!a) return 1;
+            if (!b) return -1;
+            return a.localeCompare(b, undefined, { numeric: true });
+          });
+          return versions.map(v => {
+            const items = reqs
+              .filter(r => (r.targetVersion || '') === v)
+              .sort((a, b) => a.priority - b.priority);
+            return { version: v, items };
           });
         });
 
@@ -1419,9 +1505,9 @@
           fileInput, newDeadline, devFilter,
           addForm, editForm, configForm,
           reminders, timelineWeeks, computedVersions, futureVersions, futureDeadlines,
-          devRequirements, dataRequirements, designRequirements,
-          filteredDevRequirements, filteredDevGroups, dataGroups, designGroups,
-          todoItems, todoDesign, todoReview, todoDev, todoData,
+          devRequirements, dataRequirements, designRequirements, reportRequirements,
+          filteredDevRequirements, filteredDevGroups, dataGroups, designGroups, reportGroups,
+          todoItems, todoDesign, todoReview, todoDev, todoData, todoReport,
           canAdd,
           parseInput, resetAddForm, confirmAdd, copyReq,
           statusLabel, updateStatus,
