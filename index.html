@@ -196,6 +196,70 @@
       85% { opacity: 1; }
       100% { opacity: 0; }
     }
+
+    /* 今日待办清单 */
+    .todo-panel {
+      background: linear-gradient(135deg, #e8f4fd 0%, #f0f7ff 100%);
+      border: 1px solid #b3d8fd;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+    }
+    .todo-panel .todo-title {
+      font-size: 16px; font-weight: 700; color: #1a73e8;
+      margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+    }
+    .todo-panel .todo-section {
+      margin-bottom: 14px;
+    }
+    .todo-panel .todo-section:last-child { margin-bottom: 0; }
+    .todo-panel .todo-section-header {
+      font-size: 13px; font-weight: 600; color: #303133;
+      padding: 4px 10px; border-radius: 4px; margin-bottom: 6px;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .todo-panel .todo-section-header.design-action { background: #e8f5e9; color: #2e7d32; }
+    .todo-panel .todo-section-header.review-action { background: #fff3e0; color: #e65100; }
+    .todo-panel .todo-section-header.dev-action { background: #e3f2fd; color: #1565c0; }
+    .todo-panel .todo-section-header.test-action { background: #fce4ec; color: #c62828; }
+    .todo-panel .todo-section-header.data-action { background: #f3e5f5; color: #6a1b9a; }
+    .todo-panel .todo-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 12px; margin: 4px 0;
+      background: #fff; border-radius: 6px; font-size: 13px;
+      border: 1px solid #e8e8e8;
+    }
+    .todo-panel .todo-item .todo-version {
+      font-size: 11px; color: #909399; background: #f0f0f0;
+      padding: 1px 6px; border-radius: 3px; flex-shrink: 0;
+    }
+    .todo-panel .todo-item .todo-req-title {
+      flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .todo-panel .todo-item .todo-req-title a {
+      color: #303133; text-decoration: none;
+    }
+    .todo-panel .todo-item .todo-req-title a:hover {
+      color: #409eff; text-decoration: underline;
+    }
+    .todo-panel .todo-item .todo-copy-btn {
+      cursor: pointer; border: none; background: none; font-size: 13px;
+      padding: 2px 4px; border-radius: 3px; flex-shrink: 0;
+    }
+    .todo-panel .todo-item .todo-copy-btn:hover { background: #f0f0f0; }
+    .todo-empty { color: #909399; font-size: 13px; padding: 8px 12px; }
+
+    /* 需求状态标签 */
+    .req-card .status-tag {
+      font-size: 10px; padding: 1px 6px; border-radius: 3px;
+      color: #fff; flex-shrink: 0;
+    }
+    .req-card .status-tag.s-pending { background: #909399; }
+    .req-card .status-tag.s-design { background: #67c23a; }
+    .req-card .status-tag.s-review { background: #e6a23c; }
+    .req-card .status-tag.s-dev { background: #409eff; }
+    .req-card .status-tag.s-testing { background: #f56c6c; }
+    .req-card .status-tag.s-done { background: #c0c4cc; }
   </style>
 </head>
 <body>
@@ -264,6 +328,66 @@
         </div>
       </div>
 
+      <!-- 📌 今日待办清单 -->
+      <div class="todo-panel" v-if="todoItems.length > 0">
+        <div class="todo-title">📌 今日待办清单</div>
+        
+        <!-- 需提给设计 -->
+        <div class="todo-section" v-if="todoDesign.length > 0">
+          <div class="todo-section-header design-action">🎨 需提给设计（{{ todoDesign.length }}）</div>
+          <div class="todo-item" v-for="item in todoDesign" :key="item.req.id">
+            <span class="todo-version">{{ item.version }}</span>
+            <span class="todo-req-title">
+              <a v-if="item.req.tapdUrl" :href="item.req.tapdUrl" target="_blank" rel="noopener">{{ item.req.title }}</a>
+              <span v-else>{{ item.req.title }}</span>
+            </span>
+            <button class="todo-copy-btn" @click="copyReq(item.req)" title="复制">📋</button>
+            <el-button v-if="isEditMode" size="small" type="success" text @click="updateStatus(item.req, 'design')">✓ 已提</el-button>
+          </div>
+        </div>
+
+        <!-- 需要宣讲 -->
+        <div class="todo-section" v-if="todoReview.length > 0">
+          <div class="todo-section-header review-action">📢 需要宣讲（{{ todoReview.length }}）</div>
+          <div class="todo-item" v-for="item in todoReview" :key="item.req.id">
+            <span class="todo-version">{{ item.version }}</span>
+            <span class="todo-req-title">
+              <a v-if="item.req.tapdUrl" :href="item.req.tapdUrl" target="_blank" rel="noopener">{{ item.req.title }}</a>
+              <span v-else>{{ item.req.title }}</span>
+            </span>
+            <button class="todo-copy-btn" @click="copyReq(item.req)" title="复制">📋</button>
+            <el-button v-if="isEditMode" size="small" type="warning" text @click="updateStatus(item.req, 'review')">✓ 已讲</el-button>
+          </div>
+        </div>
+
+        <!-- 需提给DE -->
+        <div class="todo-section" v-if="todoDev.length > 0">
+          <div class="todo-section-header dev-action">👨‍💻 需提给DE开发（{{ todoDev.length }}）</div>
+          <div class="todo-item" v-for="item in todoDev" :key="item.req.id">
+            <span class="todo-version">{{ item.version }}</span>
+            <span class="todo-req-title">
+              <a v-if="item.req.tapdUrl" :href="item.req.tapdUrl" target="_blank" rel="noopener">{{ item.req.title }}</a>
+              <span v-else>{{ item.req.title }}</span>
+            </span>
+            <button class="todo-copy-btn" @click="copyReq(item.req)" title="复制">📋</button>
+            <el-button v-if="isEditMode" size="small" type="primary" text @click="updateStatus(item.req, 'dev')">✓ 已提</el-button>
+          </div>
+        </div>
+
+        <!-- 数据需求待对齐 -->
+        <div class="todo-section" v-if="todoData.length > 0">
+          <div class="todo-section-header data-action">📊 数据需求待对齐（{{ todoData.length }}）</div>
+          <div class="todo-item" v-for="item in todoData" :key="item.req.id">
+            <span class="todo-version">截止 {{ item.deadline }}</span>
+            <span class="todo-req-title">
+              <a v-if="item.req.tapdUrl" :href="item.req.tapdUrl" target="_blank" rel="noopener">{{ item.req.title }}</a>
+              <span v-else>{{ item.req.title }}</span>
+            </span>
+            <button class="todo-copy-btn" @click="copyReq(item.req)" title="复制">📋</button>
+          </div>
+        </div>
+      </div>
+
       <!-- 需求面板 -->
       <div class="main-content">
         <!-- 开发需求 -->
@@ -300,6 +424,7 @@
                     <span v-else>{{ req.title }}</span>
                   </div>
                   <div class="req-tags">
+                    <span class="status-tag" :class="'s-' + (req.status || 'pending')">{{ statusLabel(req.status) }}</span>
                     <span v-if="req.needReport" class="mini-tag report">需上报</span>
                     <span v-if="req.needExperiment" class="mini-tag experiment">需实验</span>
                     <span v-if="req.needDesign" class="mini-tag design">需设计</span>
@@ -308,6 +433,19 @@
                 </div>
                 <div class="actions">
                   <button class="action-btn" @click="copyReq(req)" title="复制标题和链接">📋</button>
+                  <el-dropdown v-if="isEditMode" trigger="click" @command="cmd => updateStatus(req, cmd)" size="small">
+                    <button class="action-btn" title="切换状态">🔄</button>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item command="pending">待排期</el-dropdown-item>
+                        <el-dropdown-item command="design">设计中</el-dropdown-item>
+                        <el-dropdown-item command="review">待宣讲</el-dropdown-item>
+                        <el-dropdown-item command="dev">开发中</el-dropdown-item>
+                        <el-dropdown-item command="testing">测试中</el-dropdown-item>
+                        <el-dropdown-item command="done">已验收</el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
                   <button v-if="isEditMode" class="action-btn" @click="editReq(req)" title="编辑">✏️</button>
                   <button v-if="isEditMode" class="action-btn danger" @click="deleteReq(req)" title="删除">🗑️</button>
                 </div>
@@ -610,6 +748,99 @@
             setTimeout(() => { showCopyToast.value = false; }, 2000);
           });
         }
+
+        // === 需求状态管理 ===
+        const STATUS_LABELS = {
+          pending: '待排期', design: '设计中', review: '待宣讲',
+          dev: '开发中', testing: '测试中', done: '已验收'
+        };
+        function statusLabel(status) {
+          return STATUS_LABELS[status || 'pending'] || '待排期';
+        }
+        function updateStatus(req, newStatus) {
+          req.status = newStatus;
+          ElMessage.success(`「${req.title}」状态已更新为：${statusLabel(newStatus)}`);
+        }
+
+        // === 今日待办计算 ===
+        const todoDesign = computed(() => {
+          // 找出当前处于"设计&宣讲"阶段的版本，其中状态为pending且needDesign的需求
+          const items = [];
+          for (const ver of computedVersions.value) {
+            const phase = getCurrentPhaseForVersion(ver.name);
+            if (phase && phase.includes('设计')) {
+              const reqs = appData.value.requirements.filter(
+                r => r.type === 'dev' && r.targetVersion === ver.name && r.needDesign && 
+                     (!r.status || r.status === 'pending')
+              );
+              reqs.forEach(req => items.push({ req, version: ver.name }));
+            }
+          }
+          // 也包括下一个版本（提前准备）中需设计但状态还是pending的
+          return items;
+        });
+
+        const todoReview = computed(() => {
+          // 需要宣讲的：版本处于"设计&宣讲"阶段 或 即将进入功能开发（本周内），状态为design的需求
+          const items = [];
+          const today = dayjs();
+          for (const ver of computedVersions.value) {
+            const phases = getVersionPhases(ver.name);
+            const designPhase = phases.find(p => p.name.includes('设计'));
+            const devPhase = phases.find(p => p.name === '功能开发');
+            // 如果当前在设计阶段后半段 或 功能开发前3天内
+            const needReview = designPhase && devPhase && 
+              today.isBetween(designPhase.start, devPhase.start.add(2, 'day'), 'day', '[]');
+            if (needReview) {
+              const reqs = appData.value.requirements.filter(
+                r => r.type === 'dev' && r.targetVersion === ver.name && 
+                     (r.status === 'design' || (r.status === 'pending' && !r.needDesign))
+              );
+              reqs.forEach(req => items.push({ req, version: ver.name }));
+            }
+          }
+          return items;
+        });
+
+        const todoDev = computed(() => {
+          // 需提给DE的：版本处于"功能开发"阶段，状态为review或design（已宣讲）的需求
+          const items = [];
+          for (const ver of computedVersions.value) {
+            const phase = getCurrentPhaseForVersion(ver.name);
+            if (phase && (phase.includes('功能开发') && !phase.includes('合流'))) {
+              const reqs = appData.value.requirements.filter(
+                r => r.type === 'dev' && r.targetVersion === ver.name && 
+                     (r.status === 'review' || r.status === 'design' || r.status === 'pending')
+              );
+              reqs.forEach(req => items.push({ req, version: ver.name }));
+            }
+          }
+          return items;
+        });
+
+        const todoData = computed(() => {
+          // 数据需求：截止日期在7天内且状态不是done的
+          const today = dayjs();
+          const items = [];
+          const config = appData.value.config;
+          if (config.dataDeadlines) {
+            for (const dl of config.dataDeadlines) {
+              const deadline = dayjs(dl);
+              const daysLeft = deadline.diff(today, 'day');
+              if (daysLeft >= 0 && daysLeft <= 7) {
+                const reqs = appData.value.requirements.filter(
+                  r => r.type === 'data' && r.targetDeadline === dl && r.status !== 'done'
+                );
+                reqs.forEach(req => items.push({ req, deadline: dayjs(dl).format('M/D') }));
+              }
+            }
+          }
+          return items;
+        });
+
+        const todoItems = computed(() => {
+          return [...todoDesign.value, ...todoReview.value, ...todoDev.value, ...todoData.value];
+        });
 
         // === 添加表单 ===
         const addForm = ref(getEmptyAddForm());
@@ -1090,8 +1321,10 @@
           reminders, timelineWeeks, computedVersions, futureVersions, futureDeadlines,
           devRequirements, dataRequirements, designRequirements,
           filteredDevRequirements, filteredDevGroups, dataGroups, designGroups,
+          todoItems, todoDesign, todoReview, todoDev, todoData,
           canAdd,
           parseInput, resetAddForm, confirmAdd, copyReq,
+          statusLabel, updateStatus,
           editReq, confirmEdit, deleteReq,
           getPhaseForWeek, getPhaseClass,
           saveData, importData, handleFileImport,
