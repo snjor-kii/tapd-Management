@@ -540,20 +540,32 @@
     </div>
 
     <!-- 添加需求对话框 -->
-    <el-dialog v-model="showAddDialog" title="添加需求" width="520px" @closed="resetAddForm">
+    <el-dialog v-model="showAddDialog" title="添加需求" width="580px" @closed="resetAddForm">
       <el-form label-position="top">
-        <el-form-item label="粘贴 TAPD 内容（支持 标题+链接 / 纯链接）">
-          <el-input v-model="addForm.rawInput" type="textarea" :rows="3" 
-                    placeholder="例如：&#10;吃饭补贴翻倍逻辑优化 https://www.tapd.cn/xxx&#10;或直接粘贴链接" 
+        <el-form-item label="粘贴 TAPD 内容（支持多行批量添加，每行一个需求）">
+          <el-input v-model="addForm.rawInput" type="textarea" :rows="5" 
+                    placeholder="支持批量粘贴，每行一个需求：&#10;吃饭补贴翻倍逻辑优化 https://www.tapd.cn/xxx&#10;睡觉补贴功能开发 https://www.tapd.cn/yyy&#10;坚持打卡白拿好礼 https://www.tapd.cn/zzz" 
                     @input="parseInput"></el-input>
         </el-form-item>
         
-        <div class="parse-preview" v-if="addForm.parsedTitle || addForm.parsedUrl">
+        <!-- 单条解析预览 -->
+        <div class="parse-preview" v-if="!addForm.isBatch && (addForm.parsedTitle || addForm.parsedUrl)">
           <div class="parsed-title" v-if="addForm.parsedTitle">📌 {{ addForm.parsedTitle }}</div>
           <div class="parsed-url" v-if="addForm.parsedUrl">🔗 {{ addForm.parsedUrl }}</div>
         </div>
 
-        <el-form-item label="需求标题" v-if="!addForm.parsedTitle">
+        <!-- 批量解析预览 -->
+        <div v-if="addForm.isBatch" style="margin: 12px 0;">
+          <div style="font-size:13px; font-weight:600; color:#303133; margin-bottom:8px;">
+            📋 已解析 {{ addForm.batchItems.length }} 条需求：
+          </div>
+          <div v-for="(item, idx) in addForm.batchItems" :key="idx" class="parse-preview" style="margin:4px 0; padding:8px 12px;">
+            <div class="parsed-title">{{ idx + 1 }}. {{ item.title || '(未识别标题)' }}</div>
+            <div class="parsed-url" v-if="item.url">🔗 {{ item.url }}</div>
+          </div>
+        </div>
+
+        <el-form-item label="需求标题" v-if="!addForm.isBatch && !addForm.parsedTitle">
           <el-input v-model="addForm.title" placeholder="请输入需求标题"></el-input>
         </el-form-item>
 
@@ -577,20 +589,22 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="属性标记">
+        <el-form-item label="属性标记（批量添加时统一应用）">
           <el-checkbox v-model="addForm.needReport">需要上报</el-checkbox>
           <el-checkbox v-model="addForm.needExperiment">需要创建实验</el-checkbox>
           <el-checkbox v-model="addForm.needDesign">需要设计</el-checkbox>
           <el-checkbox v-model="addForm.needClient" v-if="addForm.type === 'dev'">需要客户端介入</el-checkbox>
         </el-form-item>
 
-        <el-form-item label="备注">
+        <el-form-item label="备注" v-if="!addForm.isBatch">
           <el-input v-model="addForm.note" placeholder="可选"></el-input>
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showAddDialog = false">取消</el-button>
-        <el-button type="primary" @click="confirmAdd" :disabled="!canAdd">确认添加</el-button>
+        <el-button type="primary" @click="confirmAdd" :disabled="!canAdd">
+          {{ addForm.isBatch ? '批量添加 ' + addForm.batchItems.length + ' 条' : '确认添加' }}
+        </el-button>
       </template>
     </el-dialog>
 
@@ -849,61 +863,115 @@
           return {
             rawInput: '', parsedTitle: '', parsedUrl: '',
             title: '', type: 'dev', targetVersion: '', targetDeadline: '',
-            needReport: false, needExperiment: false, needDesign: false, needClient: false, note: ''
+            needReport: false, needExperiment: false, needDesign: false, needClient: false, note: '',
+            isBatch: false, batchItems: []
           };
         }
         function resetAddForm() { addForm.value = getEmptyAddForm(); }
 
-        // 解析输入
+        // 解析输入（支持多行批量）
         function parseInput() {
           const raw = addForm.value.rawInput.trim();
           const urlRegex = /https?:\/\/[^\s]+/;
-          const match = raw.match(urlRegex);
-          if (match) {
-            addForm.value.parsedUrl = match[0];
-            let title = raw.replace(match[0], '').replace(/[【】\[\]]/g, '').trim();
-            if (!title) {
-              const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
-              if (lines.length > 1) {
-                const nonUrlLine = lines.find(l => !urlRegex.test(l));
-                if (nonUrlLine) title = nonUrlLine.replace(/[【】\[\]]/g, '').trim();
+          const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+          
+          // 判断是否批量模式：多行且至少2行包含URL或有意义内容
+          const validLines = lines.filter(l => urlRegex.test(l) || l.length > 2);
+          
+          if (validLines.length > 1) {
+            // 批量模式
+            addForm.value.isBatch = true;
+            addForm.value.batchItems = validLines.map(line => {
+              const match = line.match(urlRegex);
+              if (match) {
+                const url = match[0];
+                const title = line.replace(url, '').replace(/[【】\[\]]/g, '').trim();
+                return { title: title || '(需手动填写标题)', url };
+              } else {
+                return { title: line.replace(/[【】\[\]]/g, '').trim(), url: '' };
               }
-            }
-            addForm.value.parsedTitle = title;
-          } else {
-            addForm.value.parsedUrl = '';
+            });
             addForm.value.parsedTitle = '';
+            addForm.value.parsedUrl = '';
+          } else {
+            // 单条模式
+            addForm.value.isBatch = false;
+            addForm.value.batchItems = [];
+            const match = raw.match(urlRegex);
+            if (match) {
+              addForm.value.parsedUrl = match[0];
+              let title = raw.replace(match[0], '').replace(/[【】\[\]]/g, '').trim();
+              addForm.value.parsedTitle = title;
+            } else {
+              addForm.value.parsedUrl = '';
+              addForm.value.parsedTitle = '';
+            }
           }
         }
 
         const canAdd = computed(() => {
+          if (addForm.value.isBatch) {
+            return addForm.value.batchItems.length > 0 && addForm.value.type;
+          }
           return (addForm.value.parsedTitle || addForm.value.title) && addForm.value.type;
         });
 
         function confirmAdd() {
           const form = addForm.value;
-          const newReq = {
-            id: 'req_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
-            title: form.parsedTitle || form.title,
-            tapdUrl: form.parsedUrl || '',
-            type: form.type,
-            needReport: form.needReport,
-            needExperiment: form.needExperiment,
-            needDesign: form.needDesign,
-            needClient: form.type === 'dev' ? form.needClient : false,
-            targetVersion: form.type === 'dev' ? form.targetVersion : '',
-            targetDeadline: form.type === 'data' ? form.targetDeadline : '',
-            priority: form.type === 'dev' 
+          
+          if (form.isBatch) {
+            // 批量添加
+            const baseCount = form.type === 'dev'
               ? appData.value.requirements.filter(r => r.type === 'dev' && r.targetVersion === form.targetVersion).length
-              : appData.value.requirements.filter(r => r.type === 'data' && r.targetDeadline === form.targetDeadline).length,
-            status: 'pending',
-            createdAt: new Date().toISOString(),
-            note: form.note
-          };
-          appData.value.requirements.push(newReq);
-          showAddDialog.value = false;
-          resetAddForm();
-          ElMessage.success('需求已添加');
+              : appData.value.requirements.filter(r => r.type === 'data' && r.targetDeadline === form.targetDeadline).length;
+            
+            form.batchItems.forEach((item, idx) => {
+              const newReq = {
+                id: 'req_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+                title: item.title,
+                tapdUrl: item.url || '',
+                type: form.type,
+                needReport: form.needReport,
+                needExperiment: form.needExperiment,
+                needDesign: form.needDesign,
+                needClient: form.type === 'dev' ? form.needClient : false,
+                targetVersion: form.type === 'dev' ? form.targetVersion : '',
+                targetDeadline: form.type === 'data' ? form.targetDeadline : '',
+                priority: baseCount + idx,
+                status: 'pending',
+                createdAt: new Date().toISOString(),
+                note: ''
+              };
+              appData.value.requirements.push(newReq);
+            });
+            showAddDialog.value = false;
+            resetAddForm();
+            ElMessage.success(`已批量添加 ${form.batchItems.length} 条需求`);
+          } else {
+            // 单条添加
+            const newReq = {
+              id: 'req_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+              title: form.parsedTitle || form.title,
+              tapdUrl: form.parsedUrl || '',
+              type: form.type,
+              needReport: form.needReport,
+              needExperiment: form.needExperiment,
+              needDesign: form.needDesign,
+              needClient: form.type === 'dev' ? form.needClient : false,
+              targetVersion: form.type === 'dev' ? form.targetVersion : '',
+              targetDeadline: form.type === 'data' ? form.targetDeadline : '',
+              priority: form.type === 'dev' 
+                ? appData.value.requirements.filter(r => r.type === 'dev' && r.targetVersion === form.targetVersion).length
+                : appData.value.requirements.filter(r => r.type === 'data' && r.targetDeadline === form.targetDeadline).length,
+              status: 'pending',
+              createdAt: new Date().toISOString(),
+              note: form.note
+            };
+            appData.value.requirements.push(newReq);
+            showAddDialog.value = false;
+            resetAddForm();
+            ElMessage.success('需求已添加');
+          }
           nextTick(initSortable);
         }
 
