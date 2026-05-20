@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>福利中心需求排期表</title>
+  <!-- Vue 3 -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <!-- Element Plus -->
+  <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+  <script src="https://unpkg.com/element-plus"></script>
+  <!-- dayjs -->
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/isoWeek.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/isBetween.js"></script>
+  <!-- SortableJS -->
+  <script src="https://unpkg.com/sortablejs@1/Sortable.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif; background: #f5f7fa; min-height: 100vh; }
+    
+    .app-container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+    
+    /* 提醒横幅 */
+    .reminder-banner { 
+      background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%); 
+      border: 1px solid #f0c36d; 
+      border-radius: 8px; 
+      padding: 12px 20px; 
+      margin-bottom: 16px;
+      display: flex; align-items: flex-start; gap: 10px;
+    }
+    .reminder-banner .icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+    .reminder-banner .items { flex: 1; }
+    .reminder-item { 
+      padding: 4px 0; font-size: 14px; color: #856404; 
+      display: flex; align-items: center; gap: 8px;
+    }
+    .reminder-item .tag { 
+      font-size: 11px; padding: 1px 6px; border-radius: 3px; 
+      color: #fff; flex-shrink: 0;
+    }
+    .reminder-item .tag.review { background: #409eff; }
+    .reminder-item .tag.data { background: #e6a23c; }
+    .reminder-item .tag.design { background: #67c23a; }
+    
+    /* 工具栏 */
+    .toolbar { 
+      display: flex; align-items: center; gap: 12px; 
+      margin-bottom: 20px; flex-wrap: wrap;
+    }
+    .toolbar .title { font-size: 22px; font-weight: 700; color: #303133; margin-right: auto; }
+    
+    /* 主内容区 - 三列 */
+    .main-content { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+    @media (max-width: 1200px) { .main-content { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 800px) { .main-content { grid-template-columns: 1fr; } }
+    
+    /* 需求面板 */
+    .panel { 
+      background: #fff; border-radius: 10px; 
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06); 
+      padding: 20px; 
+    }
+    .panel-title { 
+      font-size: 16px; font-weight: 600; color: #303133; 
+      margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+    }
+    .panel-title .count { 
+      background: #ecf5ff; color: #409eff; 
+      padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 500;
+    }
+    .panel-filter { margin-bottom: 12px; }
+    
+    /* 需求分组 */
+    .req-group { margin-bottom: 20px; }
+    .req-group-header { 
+      font-size: 13px; font-weight: 600; color: #606266; 
+      padding: 6px 12px; background: #f4f4f5; border-radius: 6px; 
+      margin-bottom: 8px; display: flex; align-items: center; gap: 8px;
+    }
+    .req-group-header .version-tag {
+      background: #409eff; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 12px;
+    }
+    .req-group-header .deadline-tag {
+      background: #e6a23c; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 12px;
+    }
+    .req-group-header .design-tag {
+      background: #67c23a; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 12px;
+    }
+    .req-group-header .countdown {
+      margin-left: auto; font-size: 12px; color: #909399; font-weight: 400;
+    }
+    
+    /* 需求卡片 */
+    .req-card { 
+      border: 1px solid #ebeef5; border-radius: 8px; padding: 10px 12px; 
+      margin-bottom: 8px; background: #fff; 
+      transition: all 0.2s; cursor: default;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .req-card:hover { border-color: #409eff; box-shadow: 0 2px 8px rgba(64,158,255,0.1); }
+    .req-card.draggable { cursor: grab; }
+    .req-card.draggable:active { cursor: grabbing; }
+    .req-card .seq-num { 
+      font-size: 13px; font-weight: 700; color: #409eff; 
+      min-width: 20px; text-align: center; flex-shrink: 0;
+    }
+    .req-card .info { flex: 1; min-width: 0; }
+    .req-card .req-title { 
+      font-size: 14px; color: #303133; font-weight: 500;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .req-card .req-title a { color: #303133; text-decoration: none; }
+    .req-card .req-title a:hover { color: #409eff; text-decoration: underline; }
+    .req-card .req-tags { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+    .req-card .req-tags .mini-tag { 
+      font-size: 10px; padding: 1px 5px; border-radius: 3px; 
+      border: 1px solid; line-height: 16px;
+    }
+    .req-card .req-tags .mini-tag.report { color: #f56c6c; border-color: #fbc4c4; background: #fef0f0; }
+    .req-card .req-tags .mini-tag.experiment { color: #e6a23c; border-color: #f5dab1; background: #fdf6ec; }
+    .req-card .req-tags .mini-tag.design { color: #67c23a; border-color: #b3e19d; background: #f0f9eb; }
+    .req-card .req-tags .mini-tag.client { color: #909399; border-color: #d3d4d6; background: #f4f4f5; }
+    .req-card .actions { display: flex; gap: 2px; flex-shrink: 0; }
+    .req-card .actions .action-btn {
+      width: 26px; height: 26px; border: none; background: none;
+      cursor: pointer; border-radius: 4px; font-size: 14px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .req-card .actions .action-btn:hover { background: #f0f0f0; }
+    .req-card .actions .action-btn.danger:hover { background: #fef0f0; }
+    
+    /* 时间线甘特图 */
+    .timeline-container { overflow-x: auto; }
+    .gantt-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 700px; }
+    .gantt-table th, .gantt-table td { 
+      padding: 6px 4px; border: 1px solid #ebeef5; text-align: center; 
+      white-space: nowrap;
+    }
+    .gantt-table th { background: #f5f7fa; font-weight: 600; color: #606266; }
+    .gantt-table .phase-cell { color: #fff; font-weight: 500; font-size: 11px; border-radius: 3px; padding: 2px 4px; }
+    .gantt-table .phase-design { background: #b39ddb; }
+    .gantt-table .phase-dev { background: #64b5f6; }
+    .gantt-table .phase-merge { background: #4db6ac; }
+    .gantt-table .phase-test { background: #ffb74d; }
+    .gantt-table .phase-release { background: #e57373; }
+    .gantt-table .current-week { background: #fff9c4 !important; }
+    .gantt-table .version-col { font-weight: 600; color: #303133; background: #fafafa; text-align: left; padding-left: 8px; }
+    
+    /* 空状态 */
+    .empty-state { 
+      text-align: center; padding: 40px 20px; color: #909399; 
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-state .text { font-size: 14px; }
+    
+    /* 添加需求对话框 */
+    .parse-preview { 
+      background: #f5f7fa; border-radius: 6px; padding: 12px; margin: 12px 0;
+      font-size: 13px;
+    }
+    .parse-preview .parsed-title { font-weight: 600; color: #303133; }
+    .parse-preview .parsed-url { color: #409eff; word-break: break-all; font-size: 12px; }
+    
+    /* 只读模式标签 */
+    .readonly-badge { 
+      background: #f0f0f0; color: #909399; 
+      padding: 4px 12px; border-radius: 12px; font-size: 12px;
+    }
+    
+    /* 设置面板 */
+    .config-section { margin-bottom: 20px; }
+    .config-section-title { font-size: 14px; font-weight: 600; color: #303133; margin-bottom: 10px; }
+    .deadline-list { display: flex; flex-wrap: wrap; gap: 8px; }
+    .deadline-chip { 
+      display: flex; align-items: center; gap: 4px;
+      background: #ecf5ff; padding: 4px 10px; border-radius: 12px; font-size: 13px; color: #409eff;
+    }
+    .deadline-chip .remove { cursor: pointer; color: #f56c6c; font-weight: 700; }
+
+    /* sortable ghost */
+    .sortable-ghost { opacity: 0.4; background: #ecf5ff; }
+    .sortable-drag { box-shadow: 0 4px 16px rgba(0,0,0,0.15); }
+
+    /* 复制成功提示 */
+    .copy-toast {
+      position: fixed; top: 20px; right: 20px; z-index: 9999;
+      background: #67c23a; color: #fff; padding: 8px 16px;
+      border-radius: 6px; font-size: 13px; 
+      animation: fadeInOut 2s ease-in-out forwards;
+    }
+    @keyframes fadeInOut {
+      0% { opacity: 0; transform: translateY(-10px); }
+      15% { opacity: 1; transform: translateY(0); }
+      85% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="app-container">
+      <!-- 复制成功提示 -->
+      <div class="copy-toast" v-if="showCopyToast">✓ 已复制到剪贴板</div>
+
+      <!-- 提醒横幅 -->
+      <div class="reminder-banner" v-if="reminders.length > 0">
+        <span class="icon">🔔</span>
+        <div class="items">
+          <div class="reminder-item" v-for="r in reminders" :key="r.text">
+            <span class="tag" :class="r.type">{{ r.typeLabel }}</span>
+            <span>{{ r.text }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 工具栏 -->
+      <div class="toolbar">
+        <span class="title">📋 福利中心需求排期表</span>
+        <span class="readonly-badge" v-if="!isEditMode">只读模式</span>
+        <el-button v-if="isEditMode" type="primary" @click="showAddDialog = true">
+          + 添加需求
+        </el-button>
+        <el-button v-if="isEditMode" @click="saveData">
+          💾 保存下载
+        </el-button>
+        <el-button v-if="isEditMode" @click="importData">
+          📂 导入数据
+        </el-button>
+        <el-button v-if="isEditMode" @click="showConfigDialog = true">
+          ⚙️ 设置
+        </el-button>
+      </div>
+
+      <!-- 版本迭代时间线 -->
+      <div class="panel" style="margin-bottom: 20px;">
+        <div class="panel-title">📊 版本迭代时间线</div>
+        <div class="timeline-container">
+          <table class="gantt-table">
+            <thead>
+              <tr>
+                <th style="min-width:100px">版本</th>
+                <th v-for="week in timelineWeeks" :key="week.start" 
+                    :class="{ 'current-week': week.isCurrent }">
+                  {{ week.label }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="ver in computedVersions" :key="ver.name">
+                <td class="version-col">{{ ver.name }}</td>
+                <td v-for="week in timelineWeeks" :key="week.start"
+                    :class="{ 'current-week': week.isCurrent }">
+                  <div v-if="getPhaseForWeek(ver, week)" 
+                       class="phase-cell"
+                       :class="getPhaseClass(getPhaseForWeek(ver, week))">
+                    {{ getPhaseForWeek(ver, week) }}
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 需求面板 -->
+      <div class="main-content">
+        <!-- 开发需求 -->
+        <div class="panel">
+          <div class="panel-title">
+            🛠️ 开发需求池
+            <span class="count">{{ filteredDevRequirements.length }}</span>
+          </div>
+          <!-- 筛选 -->
+          <div class="panel-filter" v-if="devRequirements.length > 0">
+            <el-radio-group v-model="devFilter" size="small">
+              <el-radio-button value="all">全部</el-radio-button>
+              <el-radio-button value="client">需客户端</el-radio-button>
+              <el-radio-button value="no-client">无需客户端</el-radio-button>
+            </el-radio-group>
+          </div>
+          <div v-if="filteredDevRequirements.length === 0" class="empty-state">
+            <div class="icon">📭</div>
+            <div class="text">暂无开发需求</div>
+          </div>
+          <div v-for="group in filteredDevGroups" :key="group.version" class="req-group">
+            <div class="req-group-header">
+              <span class="version-tag">{{ group.version || '未分配版本' }}</span>
+              <span v-if="group.phase">当前阶段: {{ group.phase }}</span>
+            </div>
+            <div :ref="el => setDevSortRef(el, group.version)">
+              <div v-for="(req, idx) in group.items" :key="req.id" 
+                   class="req-card" :class="{ draggable: isEditMode }"
+                   :data-id="req.id">
+                <span class="seq-num">{{ idx + 1 }}</span>
+                <div class="info">
+                  <div class="req-title">
+                    <a v-if="req.tapdUrl" :href="req.tapdUrl" target="_blank" rel="noopener">{{ req.title }}</a>
+                    <span v-else>{{ req.title }}</span>
+                  </div>
+                  <div class="req-tags">
+                    <span v-if="req.needReport" class="mini-tag report">需上报</span>
+                    <span v-if="req.needExperiment" class="mini-tag experiment">需实验</span>
+                    <span v-if="req.needDesign" class="mini-tag design">需设计</span>
+                    <span v-if="req.needClient" class="mini-tag client">需客户端</span>
+                  </div>
+                </div>
+                <div class="actions">
+                  <button class="action-btn" @click="copyReq(req)" title="复制标题和链接">📋</button>
+                  <button v-if="isEditMode" class="action-btn" @click="editReq(req)" title="编辑">✏️</button>
+                  <button v-if="isEditMode" class="action-btn danger" @click="deleteReq(req)" title="删除">🗑️</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 数据需求 -->
+        <div class="panel">
+          <div class="panel-title">
+            📊 数据需求池
+            <span class="count">{{ dataRequirements.length }}</span>
+          </div>
+          <div v-if="dataRequirements.length === 0" class="empty-state">
+            <div class="icon">📭</div>
+            <div class="text">暂无数据需求</div>
+          </div>
+          <div v-for="group in dataGroups" :key="group.deadline" class="req-group">
+            <div class="req-group-header">
+              <span class="deadline-tag">截止 {{ group.deadlineLabel }}</span>
+              <span class="countdown" v-if="group.daysLeft !== null">
+                {{ group.daysLeft > 0 ? '剩余 ' + group.daysLeft + ' 天' : (group.daysLeft === 0 ? '⚠️ 今天截止' : '已过期') }}
+              </span>
+            </div>
+            <div :ref="el => setDataSortRef(el, group.deadline)">
+              <div v-for="(req, idx) in group.items" :key="req.id"
+                   class="req-card" :class="{ draggable: isEditMode }"
+                   :data-id="req.id">
+                <span class="seq-num">{{ idx + 1 }}</span>
+                <div class="info">
+                  <div class="req-title">
+                    <a v-if="req.tapdUrl" :href="req.tapdUrl" target="_blank" rel="noopener">{{ req.title }}</a>
+                    <span v-else>{{ req.title }}</span>
+                  </div>
+                  <div class="req-tags">
+                    <span v-if="req.needReport" class="mini-tag report">需上报</span>
+                    <span v-if="req.needExperiment" class="mini-tag experiment">需实验</span>
+                  </div>
+                </div>
+                <div class="actions">
+                  <button class="action-btn" @click="copyReq(req)" title="复制标题和链接">📋</button>
+                  <button v-if="isEditMode" class="action-btn" @click="editReq(req)" title="编辑">✏️</button>
+                  <button v-if="isEditMode" class="action-btn danger" @click="deleteReq(req)" title="删除">🗑️</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 设计需求池 -->
+        <div class="panel">
+          <div class="panel-title">
+            🎨 设计需求池
+            <span class="count">{{ designRequirements.length }}</span>
+          </div>
+          <div v-if="designRequirements.length === 0" class="empty-state">
+            <div class="icon">📭</div>
+            <div class="text">暂无设计需求</div>
+          </div>
+          <div v-for="group in designGroups" :key="group.version" class="req-group">
+            <div class="req-group-header">
+              <span class="design-tag">{{ group.version || '未分配版本' }}</span>
+              <span class="countdown" v-if="group.designDeadline">
+                设计评审: {{ group.designDeadline }}
+              </span>
+            </div>
+            <div :ref="el => setDesignSortRef(el, group.version)">
+              <div v-for="(req, idx) in group.items" :key="req.id"
+                   class="req-card" :class="{ draggable: isEditMode }"
+                   :data-id="req.id">
+                <span class="seq-num">{{ idx + 1 }}</span>
+                <div class="info">
+                  <div class="req-title">
+                    <a v-if="req.tapdUrl" :href="req.tapdUrl" target="_blank" rel="noopener">{{ req.title }}</a>
+                    <span v-else>{{ req.title }}</span>
+                  </div>
+                  <div class="req-tags">
+                    <span class="mini-tag design">需设计</span>
+                    <span v-if="req.needClient" class="mini-tag client">需客户端</span>
+                  </div>
+                </div>
+                <div class="actions">
+                  <button class="action-btn" @click="copyReq(req)" title="复制标题和链接">📋</button>
+                  <button v-if="isEditMode" class="action-btn" @click="editReq(req)" title="编辑">✏️</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 添加需求对话框 -->
+    <el-dialog v-model="showAddDialog" title="添加需求" width="520px" @closed="resetAddForm">
+      <el-form label-position="top">
+        <el-form-item label="粘贴 TAPD 内容（支持 标题+链接 / 纯链接）">
+          <el-input v-model="addForm.rawInput" type="textarea" :rows="3" 
+                    placeholder="例如：&#10;吃饭补贴翻倍逻辑优化 https://www.tapd.cn/xxx&#10;或直接粘贴链接" 
+                    @input="parseInput"></el-input>
+        </el-form-item>
+        
+        <div class="parse-preview" v-if="addForm.parsedTitle || addForm.parsedUrl">
+          <div class="parsed-title" v-if="addForm.parsedTitle">📌 {{ addForm.parsedTitle }}</div>
+          <div class="parsed-url" v-if="addForm.parsedUrl">🔗 {{ addForm.parsedUrl }}</div>
+        </div>
+
+        <el-form-item label="需求标题" v-if="!addForm.parsedTitle">
+          <el-input v-model="addForm.title" placeholder="请输入需求标题"></el-input>
+        </el-form-item>
+
+        <el-form-item label="需求类型">
+          <el-radio-group v-model="addForm.type">
+            <el-radio value="dev">🛠️ 开发需求</el-radio>
+            <el-radio value="data">📊 数据需求</el-radio>
+          </el-radio-group>
+        </el-form-item>
+
+        <el-form-item label="目标版本" v-if="addForm.type === 'dev'">
+          <el-select v-model="addForm.targetVersion" placeholder="选择目标版本">
+            <el-option v-for="v in futureVersions" :key="v" :label="v" :value="v"></el-option>
+            <el-option label="未定" value=""></el-option>
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="关联截止日期" v-if="addForm.type === 'data'">
+          <el-select v-model="addForm.targetDeadline" placeholder="选择截止日期">
+            <el-option v-for="d in futureDeadlines" :key="d" :label="d" :value="d"></el-option>
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="属性标记">
+          <el-checkbox v-model="addForm.needReport">需要上报</el-checkbox>
+          <el-checkbox v-model="addForm.needExperiment">需要创建实验</el-checkbox>
+          <el-checkbox v-model="addForm.needDesign">需要设计</el-checkbox>
+          <el-checkbox v-model="addForm.needClient" v-if="addForm.type === 'dev'">需要客户端介入</el-checkbox>
+        </el-form-item>
+
+        <el-form-item label="备注">
+          <el-input v-model="addForm.note" placeholder="可选"></el-input>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showAddDialog = false">取消</el-button>
+        <el-button type="primary" @click="confirmAdd" :disabled="!canAdd">确认添加</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 编辑需求对话框 -->
+    <el-dialog v-model="showEditDialog" title="编辑需求" width="520px">
+      <el-form label-position="top" v-if="editForm">
+        <el-form-item label="需求标题">
+          <el-input v-model="editForm.title"></el-input>
+        </el-form-item>
+        <el-form-item label="TAPD 链接">
+          <el-input v-model="editForm.tapdUrl"></el-input>
+        </el-form-item>
+        <el-form-item label="需求类型">
+          <el-radio-group v-model="editForm.type">
+            <el-radio value="dev">🛠️ 开发需求</el-radio>
+            <el-radio value="data">📊 数据需求</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="目标版本" v-if="editForm.type === 'dev'">
+          <el-select v-model="editForm.targetVersion" placeholder="选择目标版本">
+            <el-option v-for="v in futureVersions" :key="v" :label="v" :value="v"></el-option>
+            <el-option label="未定" value=""></el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="关联截止日期" v-if="editForm.type === 'data'">
+          <el-select v-model="editForm.targetDeadline" placeholder="选择截止日期">
+            <el-option v-for="d in futureDeadlines" :key="d" :label="d" :value="d"></el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="属性标记">
+          <el-checkbox v-model="editForm.needReport">需要上报</el-checkbox>
+          <el-checkbox v-model="editForm.needExperiment">需要创建实验</el-checkbox>
+          <el-checkbox v-model="editForm.needDesign">需要设计</el-checkbox>
+          <el-checkbox v-model="editForm.needClient" v-if="editForm.type === 'dev'">需要客户端介入</el-checkbox>
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="editForm.note"></el-input>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showEditDialog = false">取消</el-button>
+        <el-button type="primary" @click="confirmEdit">保存修改</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 配置对话框 -->
+    <el-dialog v-model="showConfigDialog" title="⚙️ 排期配置" width="560px">
+      <div class="config-section">
+        <div class="config-section-title">版本迭代配置</div>
+        <el-form label-position="left" label-width="120px" size="default">
+          <el-form-item label="基准版本号">
+            <el-input v-model="configForm.baseVersion" placeholder="如 8.170.0" style="width:200px"></el-input>
+          </el-form-item>
+          <el-form-item label="基准起始日期">
+            <el-date-picker v-model="configForm.baseStartDate" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD" style="width:200px"></el-date-picker>
+          </el-form-item>
+          <el-form-item label="迭代间隔(周)">
+            <el-input-number v-model="configForm.iterationWeeks" :min="1" :max="4" style="width:200px"></el-input-number>
+          </el-form-item>
+        </el-form>
+      </div>
+
+      <div class="config-section">
+        <div class="config-section-title">Review 日配置</div>
+        <el-form label-position="left" label-width="120px" size="default">
+          <el-form-item label="Review基准日">
+            <el-date-picker v-model="configForm.reviewDayBase" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD" style="width:200px"></el-date-picker>
+          </el-form-item>
+          <el-form-item label="间隔(周)">
+            <el-input-number v-model="configForm.reviewIntervalWeeks" :min="1" :max="4" style="width:200px"></el-input-number>
+          </el-form-item>
+        </el-form>
+      </div>
+
+      <div class="config-section">
+        <div class="config-section-title">数据需求截止日期</div>
+        <div class="deadline-list">
+          <span class="deadline-chip" v-for="(d, idx) in configForm.dataDeadlines" :key="idx">
+            {{ d }}
+            <span class="remove" @click="removeDeadline(idx)">×</span>
+          </span>
+        </div>
+        <div style="margin-top:10px; display:flex; gap:8px; align-items:center;">
+          <el-date-picker v-model="newDeadline" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD" placeholder="添加截止日期" size="small" style="width:180px"></el-date-picker>
+          <el-button size="small" type="primary" @click="addDeadline" :disabled="!newDeadline">添加</el-button>
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button @click="showConfigDialog = false">取消</el-button>
+        <el-button type="primary" @click="saveConfig">保存配置</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 隐藏的文件输入 -->
+    <input type="file" ref="fileInput" accept=".json" style="display:none" @change="handleFileImport">
+  </div>
+
+  <script>
+    dayjs.extend(dayjs_plugin_isoWeek);
+    dayjs.extend(dayjs_plugin_isBetween);
+
+    const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
+
+    const app = createApp({
+      setup() {
+        // === 状态 ===
+        const isEditMode = ref(new URLSearchParams(window.location.search).get('edit') === '1');
+        const appData = ref({ config: getDefaultConfig(), requirements: [] });
+        const showAddDialog = ref(false);
+        const showEditDialog = ref(false);
+        const showConfigDialog = ref(false);
+        const showCopyToast = ref(false);
+        const fileInput = ref(null);
+        const newDeadline = ref('');
+        const devFilter = ref('all');
+        
+        // 排序实例
+        const sortInstances = ref([]);
+
+        // 默认配置
+        function getDefaultConfig() {
+          return {
+            baseVersion: "8.170.0",
+            baseStartDate: "2026-05-18",
+            iterationWeeks: 2,
+            phases: [
+              { name: "设计&宣讲", weeks: 1 },
+              { name: "功能开发", weeks: 1 },
+              { name: "功能开发+合流截止", weeks: 1 },
+              { name: "系统测试+周三灰度", weeks: 1 },
+              { name: "周二上架", weeks: 0 }
+            ],
+            dataDeadlines: ["2026-05-18", "2026-06-01", "2026-06-15"],
+            reviewDayBase: "2026-05-20",
+            reviewIntervalWeeks: 2
+          };
+        }
+
+        // === 一键复制 ===
+        function copyReq(req) {
+          const text = req.tapdUrl ? `${req.title} ${req.tapdUrl}` : req.title;
+          navigator.clipboard.writeText(text).then(() => {
+            showCopyToast.value = true;
+            setTimeout(() => { showCopyToast.value = false; }, 2000);
+          }).catch(() => {
+            // fallback
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            showCopyToast.value = true;
+            setTimeout(() => { showCopyToast.value = false; }, 2000);
+          });
+        }
+
+        // === 添加表单 ===
+        const addForm = ref(getEmptyAddForm());
+        function getEmptyAddForm() {
+          return {
+            rawInput: '', parsedTitle: '', parsedUrl: '',
+            title: '', type: 'dev', targetVersion: '', targetDeadline: '',
+            needReport: false, needExperiment: false, needDesign: false, needClient: false, note: ''
+          };
+        }
+        function resetAddForm() { addForm.value = getEmptyAddForm(); }
+
+        // 解析输入
+        function parseInput() {
+          const raw = addForm.value.rawInput.trim();
+          const urlRegex = /https?:\/\/[^\s]+/;
+          const match = raw.match(urlRegex);
+          if (match) {
+            addForm.value.parsedUrl = match[0];
+            let title = raw.replace(match[0], '').replace(/[【】\[\]]/g, '').trim();
+            if (!title) {
+              const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+              if (lines.length > 1) {
+                const nonUrlLine = lines.find(l => !urlRegex.test(l));
+                if (nonUrlLine) title = nonUrlLine.replace(/[【】\[\]]/g, '').trim();
+              }
+            }
+            addForm.value.parsedTitle = title;
+          } else {
+            addForm.value.parsedUrl = '';
+            addForm.value.parsedTitle = '';
+          }
+        }
+
+        const canAdd = computed(() => {
+          return (addForm.value.parsedTitle || addForm.value.title) && addForm.value.type;
+        });
+
+        function confirmAdd() {
+          const form = addForm.value;
+          const newReq = {
+            id: 'req_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+            title: form.parsedTitle || form.title,
+            tapdUrl: form.parsedUrl || '',
+            type: form.type,
+            needReport: form.needReport,
+            needExperiment: form.needExperiment,
+            needDesign: form.needDesign,
+            needClient: form.type === 'dev' ? form.needClient : false,
+            targetVersion: form.type === 'dev' ? form.targetVersion : '',
+            targetDeadline: form.type === 'data' ? form.targetDeadline : '',
+            priority: form.type === 'dev' 
+              ? appData.value.requirements.filter(r => r.type === 'dev' && r.targetVersion === form.targetVersion).length
+              : appData.value.requirements.filter(r => r.type === 'data' && r.targetDeadline === form.targetDeadline).length,
+            status: 'pending',
+            createdAt: new Date().toISOString(),
+            note: form.note
+          };
+          appData.value.requirements.push(newReq);
+          showAddDialog.value = false;
+          resetAddForm();
+          ElMessage.success('需求已添加');
+          nextTick(initSortable);
+        }
+
+        // === 编辑 ===
+        const editForm = ref(null);
+        let editingId = null;
+
+        function editReq(req) {
+          editingId = req.id;
+          editForm.value = { ...req };
+          showEditDialog.value = true;
+        }
+        function confirmEdit() {
+          const idx = appData.value.requirements.findIndex(r => r.id === editingId);
+          if (idx >= 0) {
+            appData.value.requirements[idx] = { ...editForm.value };
+          }
+          showEditDialog.value = false;
+          ElMessage.success('已保存修改');
+        }
+        function deleteReq(req) {
+          ElMessageBox.confirm('确定删除该需求？', '提示', { type: 'warning' })
+            .then(() => {
+              appData.value.requirements = appData.value.requirements.filter(r => r.id !== req.id);
+              ElMessage.success('已删除');
+            }).catch(() => {});
+        }
+
+        // === 计算属性：需求分组 ===
+        const devRequirements = computed(() => appData.value.requirements.filter(r => r.type === 'dev'));
+        const dataRequirements = computed(() => appData.value.requirements.filter(r => r.type === 'data'));
+        const designRequirements = computed(() => appData.value.requirements.filter(r => r.needDesign));
+
+        // 开发需求筛选
+        const filteredDevRequirements = computed(() => {
+          if (devFilter.value === 'all') return devRequirements.value;
+          if (devFilter.value === 'client') return devRequirements.value.filter(r => r.needClient);
+          return devRequirements.value.filter(r => !r.needClient);
+        });
+
+        const filteredDevGroups = computed(() => {
+          const reqs = filteredDevRequirements.value;
+          const versions = [...new Set(reqs.map(r => r.targetVersion || ''))];
+          versions.sort((a, b) => {
+            if (!a) return 1;
+            if (!b) return -1;
+            return a.localeCompare(b, undefined, { numeric: true });
+          });
+          return versions.map(v => {
+            const items = reqs
+              .filter(r => (r.targetVersion || '') === v)
+              .sort((a, b) => a.priority - b.priority);
+            const phase = v ? getCurrentPhaseForVersion(v) : null;
+            return { version: v, items, phase };
+          });
+        });
+
+        const dataGroups = computed(() => {
+          const deadlines = [...new Set(dataRequirements.value.map(r => r.targetDeadline || ''))];
+          deadlines.sort();
+          return deadlines.map(d => {
+            const items = dataRequirements.value
+              .filter(r => (r.targetDeadline || '') === d)
+              .sort((a, b) => a.priority - b.priority);
+            const daysLeft = d ? dayjs(d).diff(dayjs(), 'day') : null;
+            return { 
+              deadline: d, 
+              deadlineLabel: d ? dayjs(d).format('MM-DD') : '未指定',
+              daysLeft, 
+              items 
+            };
+          });
+        });
+
+        // 设计需求池分组（按版本）
+        const designGroups = computed(() => {
+          const reqs = designRequirements.value;
+          const versions = [...new Set(reqs.map(r => r.targetVersion || ''))];
+          versions.sort((a, b) => {
+            if (!a) return 1;
+            if (!b) return -1;
+            return a.localeCompare(b, undefined, { numeric: true });
+          });
+          return versions.map(v => {
+            const items = reqs
+              .filter(r => (r.targetVersion || '') === v)
+              .sort((a, b) => a.priority - b.priority);
+            // 计算设计评审建议日期
+            let designDeadline = null;
+            if (v) {
+              const phases = getVersionPhases(v);
+              const devPhase = phases.find(p => p.name === '功能开发');
+              if (devPhase) {
+                designDeadline = devPhase.start.subtract(7, 'day').format('M/D') + ' 前';
+              }
+            }
+            return { version: v, items, designDeadline };
+          });
+        });
+
+        // === 版本时间线计算 ===
+        function parseVersionNumber(versionStr) {
+          const parts = versionStr.split('.');
+          return parseInt(parts[1]) || 0;
+        }
+
+        function getVersionStartDate(versionStr) {
+          const config = appData.value.config;
+          const baseNum = parseVersionNumber(config.baseVersion);
+          const targetNum = parseVersionNumber(versionStr);
+          const offset = (targetNum - baseNum) * config.iterationWeeks * 7;
+          return dayjs(config.baseStartDate).add(offset, 'day');
+        }
+
+        function getVersionPhases(versionStr) {
+          const start = getVersionStartDate(versionStr);
+          const phases = appData.value.config.phases;
+          let current = start;
+          return phases.map(p => {
+            const phaseStart = current;
+            const phaseEnd = p.weeks > 0 ? current.add(p.weeks * 7 - 1, 'day') : current;
+            current = p.weeks > 0 ? current.add(p.weeks * 7, 'day') : current;
+            return { name: p.name, start: phaseStart, end: phaseEnd };
+          });
+        }
+
+        function getCurrentPhaseForVersion(versionStr) {
+          const phases = getVersionPhases(versionStr);
+          const today = dayjs();
+          for (const p of phases) {
+            if (today.isBetween(p.start, p.end, 'day', '[]')) {
+              return p.name;
+            }
+          }
+          return null;
+        }
+
+        const timelineWeeks = computed(() => {
+          const weeks = [];
+          let start = dayjs().startOf('isoWeek').subtract(2, 'week');
+          for (let i = 0; i < 12; i++) {
+            const weekStart = start.add(i * 7, 'day');
+            const weekEnd = weekStart.add(6, 'day');
+            const isCurrent = dayjs().isBetween(weekStart, weekEnd, 'day', '[]');
+            weeks.push({
+              start: weekStart.format('YYYY-MM-DD'),
+              end: weekEnd.format('YYYY-MM-DD'),
+              label: weekStart.format('M.D') + '-' + weekEnd.format('M.D'),
+              isCurrent
+            });
+          }
+          return weeks;
+        });
+
+        const computedVersions = computed(() => {
+          const config = appData.value.config;
+          const baseNum = parseVersionNumber(config.baseVersion);
+          const versions = [];
+          for (let i = -1; i <= 4; i++) {
+            const num = baseNum + i;
+            const major = config.baseVersion.split('.')[0];
+            const name = `${major}.${num}.0`;
+            versions.push({ name, phases: getVersionPhases(name) });
+          }
+          return versions;
+        });
+
+        const futureVersions = computed(() => {
+          return computedVersions.value.map(v => v.name);
+        });
+
+        function getPhaseForWeek(ver, week) {
+          const weekStart = dayjs(week.start);
+          const weekEnd = dayjs(week.end);
+          for (const phase of ver.phases) {
+            if (phase.start.isBefore(weekEnd.add(1, 'day')) && phase.end.isAfter(weekStart.subtract(1, 'day'))) {
+              return phase.name;
+            }
+          }
+          return null;
+        }
+
+        function getPhaseClass(phaseName) {
+          if (!phaseName) return '';
+          if (phaseName.includes('上架')) return 'phase-release';
+          if (phaseName.includes('测试') || phaseName.includes('灰度')) return 'phase-test';
+          if (phaseName.includes('合流')) return 'phase-merge';
+          if (phaseName.includes('设计')) return 'phase-design';
+          if (phaseName.includes('功能开发')) return 'phase-dev';
+          return '';
+        }
+
+        // === 提醒计算 ===
+        const reminders = computed(() => {
+          const config = appData.value.config;
+          const today = dayjs();
+          const items = [];
+
+          if (config.reviewDayBase) {
+            let reviewDay = dayjs(config.reviewDayBase);
+            while (reviewDay.isBefore(today.subtract(1, 'day'))) {
+              reviewDay = reviewDay.add(config.reviewIntervalWeeks * 7, 'day');
+            }
+            const daysUntil = reviewDay.diff(today, 'day');
+            if (daysUntil >= 0 && daysUntil <= 7) {
+              const targetVersionNum = parseVersionNumber(config.baseVersion) + 2;
+              const major = config.baseVersion.split('.')[0];
+              const targetVersion = `${major}.${targetVersionNum}.0`;
+              items.push({
+                type: 'review',
+                typeLabel: 'Review',
+                text: daysUntil === 0 
+                  ? `今天是 Review 日！请 review ${targetVersion} 迭代需求`
+                  : `${daysUntil}天后 (${reviewDay.format('M/D 周dd')}) Review ${targetVersion} 迭代需求`
+              });
+            }
+          }
+
+          if (config.dataDeadlines) {
+            for (const dl of config.dataDeadlines) {
+              const deadline = dayjs(dl);
+              const daysUntil = deadline.diff(today, 'day');
+              if (daysUntil >= 0 && daysUntil <= 3) {
+                const dataReqs = appData.value.requirements.filter(r => r.type === 'data' && r.targetDeadline === dl);
+                items.push({
+                  type: 'data',
+                  typeLabel: '数据截止',
+                  text: daysUntil === 0 
+                    ? `⚠️ 今天是数据需求截止日！请确认已与数据开发对齐 (${dataReqs.length}个需求)`
+                    : `${daysUntil}天后 (${deadline.format('M/D')}) 数据需求截止，请尽快与数据开发对齐 (${dataReqs.length}个需求)`
+                });
+              }
+            }
+          }
+
+          const designReqs = appData.value.requirements.filter(r => r.needDesign && r.targetVersion);
+          for (const req of designReqs) {
+            const phases = getVersionPhases(req.targetVersion);
+            const devPhase = phases.find(p => p.name === '功能开发');
+            if (devPhase) {
+              const designReviewDate = devPhase.start.subtract(7, 'day');
+              const daysUntil = designReviewDate.diff(today, 'day');
+              if (daysUntil >= 0 && daysUntil <= 7) {
+                items.push({
+                  type: 'design',
+                  typeLabel: '设计评审',
+                  text: daysUntil === 0
+                    ? `今天应约设计评审：「${req.title}」(${req.targetVersion})`
+                    : `${daysUntil}天后需约设计评审：「${req.title}」(${req.targetVersion})`
+                });
+              }
+            }
+          }
+
+          return items;
+        });
+
+        // === 数据截止日期列表 ===
+        const futureDeadlines = computed(() => {
+          const config = appData.value.config;
+          if (!config.dataDeadlines) return [];
+          return config.dataDeadlines.filter(d => dayjs(d).isAfter(dayjs().subtract(7, 'day'))).sort();
+        });
+
+        // === 配置管理 ===
+        const configForm = ref({});
+        watch(showConfigDialog, (val) => {
+          if (val) {
+            configForm.value = JSON.parse(JSON.stringify(appData.value.config));
+          }
+        });
+        function removeDeadline(idx) {
+          configForm.value.dataDeadlines.splice(idx, 1);
+        }
+        function addDeadline() {
+          if (newDeadline.value && !configForm.value.dataDeadlines.includes(newDeadline.value)) {
+            configForm.value.dataDeadlines.push(newDeadline.value);
+            configForm.value.dataDeadlines.sort();
+            newDeadline.value = '';
+          }
+        }
+        function saveConfig() {
+          appData.value.config = JSON.parse(JSON.stringify(configForm.value));
+          showConfigDialog.value = false;
+          ElMessage.success('配置已保存');
+        }
+
+        // === 数据加载与保存 ===
+        async function loadData() {
+          try {
+            const res = await fetch('./data.json');
+            if (res.ok) {
+              const data = await res.json();
+              appData.value = data;
+            }
+          } catch (e) {
+            console.log('No data.json found, using empty state');
+          }
+        }
+
+        function saveData() {
+          const json = JSON.stringify(appData.value, null, 2);
+          const blob = new Blob([json], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'data.json';
+          a.click();
+          URL.revokeObjectURL(url);
+          ElMessage.success('data.json 已下载，请替换原文件');
+        }
+
+        function importData() {
+          fileInput.value.click();
+        }
+        function handleFileImport(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            try {
+              const data = JSON.parse(ev.target.result);
+              appData.value = data;
+              ElMessage.success('数据导入成功');
+              nextTick(initSortable);
+            } catch (err) {
+              ElMessage.error('文件解析失败，请确认是有效的JSON');
+            }
+          };
+          reader.readAsText(file);
+          e.target.value = '';
+        }
+
+        // === 拖拽排序 ===
+        const devSortRefs = {};
+        const dataSortRefs = {};
+        const designSortRefs = {};
+
+        function setDevSortRef(el, version) {
+          if (el) devSortRefs[version] = el;
+        }
+        function setDataSortRef(el, deadline) {
+          if (el) dataSortRefs[deadline] = el;
+        }
+        function setDesignSortRef(el, version) {
+          if (el) designSortRefs[version] = el;
+        }
+
+        function initSortable() {
+          if (!isEditMode.value) return;
+          sortInstances.value.forEach(s => s.destroy());
+          sortInstances.value = [];
+
+          Object.entries(devSortRefs).forEach(([version, el]) => {
+            if (!el) return;
+            const instance = Sortable.create(el, {
+              animation: 150,
+              ghostClass: 'sortable-ghost',
+              dragClass: 'sortable-drag',
+              onEnd: (evt) => {
+                const items = filteredDevRequirements.value.filter(r => (r.targetVersion || '') === version);
+                const [moved] = items.splice(evt.oldIndex, 1);
+                items.splice(evt.newIndex, 0, moved);
+                items.forEach((item, idx) => { item.priority = idx; });
+              }
+            });
+            sortInstances.value.push(instance);
+          });
+
+          Object.entries(dataSortRefs).forEach(([deadline, el]) => {
+            if (!el) return;
+            const instance = Sortable.create(el, {
+              animation: 150,
+              ghostClass: 'sortable-ghost',
+              dragClass: 'sortable-drag',
+              onEnd: (evt) => {
+                const items = dataRequirements.value.filter(r => (r.targetDeadline || '') === deadline);
+                const [moved] = items.splice(evt.oldIndex, 1);
+                items.splice(evt.newIndex, 0, moved);
+                items.forEach((item, idx) => { item.priority = idx; });
+              }
+            });
+            sortInstances.value.push(instance);
+          });
+
+          Object.entries(designSortRefs).forEach(([version, el]) => {
+            if (!el) return;
+            const instance = Sortable.create(el, {
+              animation: 150,
+              ghostClass: 'sortable-ghost',
+              dragClass: 'sortable-drag',
+              onEnd: (evt) => {
+                // 设计池排序不改变原始优先级，仅视觉反馈
+              }
+            });
+            sortInstances.value.push(instance);
+          });
+        }
+
+        // === 生命周期 ===
+        onMounted(async () => {
+          await loadData();
+          nextTick(() => {
+            setTimeout(initSortable, 300);
+          });
+        });
+
+        watch(() => appData.value.requirements.length, () => {
+          nextTick(() => setTimeout(initSortable, 100));
+        });
+
+        return {
+          isEditMode, appData, showAddDialog, showEditDialog, showConfigDialog, showCopyToast,
+          fileInput, newDeadline, devFilter,
+          addForm, editForm, configForm,
+          reminders, timelineWeeks, computedVersions, futureVersions, futureDeadlines,
+          devRequirements, dataRequirements, designRequirements,
+          filteredDevRequirements, filteredDevGroups, dataGroups, designGroups,
+          canAdd,
+          parseInput, resetAddForm, confirmAdd, copyReq,
+          editReq, confirmEdit, deleteReq,
+          getPhaseForWeek, getPhaseClass,
+          saveData, importData, handleFileImport,
+          saveConfig, removeDeadline, addDeadline,
+          setDevSortRef, setDataSortRef, setDesignSortRef
+        };
+      }
+    });
+
+    app.use(ElementPlus);
+    app.mount('#app');
+
+    // 确保 ElMessage 和 ElMessageBox 全局可用
+    window.ElMessage = ElementPlus.ElMessage;
+    window.ElMessageBox = ElementPlus.ElMessageBox;
+  </script>
+</body>
+</html>

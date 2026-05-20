@@ -1,0 +1,99 @@
+{
+  "config": {
+    "baseVersion": "8.170.0",
+    "baseStartDate": "2026-05-18",
+    "iterationWeeks": 2,
+    "phases": [
+      { "name": "设计&宣讲", "weeks": 1 },
+      { "name": "功能开发", "weeks": 1 },
+      { "name": "功能开发+合流截止", "weeks": 1 },
+      { "name": "系统测试+周三灰度", "weeks": 1 },
+      { "name": "周二上架", "weeks": 0 }
+    ],
+    "dataDeadlines": ["2026-05-18", "2026-06-01", "2026-06-15", "2026-06-29"],
+    "reviewDayBase": "2026-05-20",
+    "reviewIntervalWeeks": 2
+  },
+  "requirements": [
+    {
+      "id": "req_demo_001",
+      "title": "吃饭补贴翻倍逻辑优化",
+      "tapdUrl": "https://www.tapd.cn/12345/prong/stories/view/001",
+      "type": "dev",
+      "needReport": false,
+      "needExperiment": true,
+      "needDesign": true,
+      "needClient": true,
+      "targetVersion": "8.171.0",
+      "targetDeadline": "",
+      "priority": 0,
+      "status": "pending",
+      "createdAt": "2026-05-19T10:00:00Z",
+      "note": ""
+    },
+    {
+      "id": "req_demo_002",
+      "title": "睡觉补贴功能开发",
+      "tapdUrl": "https://www.tapd.cn/12345/prong/stories/view/002",
+      "type": "dev",
+      "needReport": true,
+      "needExperiment": false,
+      "needDesign": true,
+      "needClient": true,
+      "targetVersion": "8.171.0",
+      "targetDeadline": "",
+      "priority": 1,
+      "status": "pending",
+      "createdAt": "2026-05-19T10:30:00Z",
+      "note": "参考吃饭补贴流程"
+    },
+    {
+      "id": "req_demo_003",
+      "title": "坚持打卡白拿好礼上线",
+      "tapdUrl": "https://www.tapd.cn/12345/prong/stories/view/003",
+      "type": "dev",
+      "needReport": true,
+      "needExperiment": true,
+      "needDesign": true,
+      "needClient": false,
+      "targetVersion": "8.170.0",
+      "targetDeadline": "",
+      "priority": 0,
+      "status": "pending",
+      "createdAt": "2026-05-18T09:00:00Z",
+      "note": "L2档5元、L3档20元"
+    },
+    {
+      "id": "req_demo_004",
+      "title": "虚拟币过期率监控看板",
+      "tapdUrl": "https://www.tapd.cn/12345/prong/stories/view/004",
+      "type": "data",
+      "needReport": false,
+      "needExperiment": false,
+      "needDesign": false,
+      "needClient": false,
+      "targetVersion": "",
+      "targetDeadline": "2026-06-01",
+      "priority": 0,
+      "status": "pending",
+      "createdAt": "2026-05-19T11:00:00Z",
+      "note": "currency_type=405"
+    },
+    {
+      "id": "req_demo_005",
+      "title": "福利中心DAU漏斗分析",
+      "tapdUrl": "https://www.tapd.cn/12345/prong/stories/view/005",
+      "type": "data",
+      "needReport": true,
+      "needExperiment": false,
+      "needDesign": false,
+      "needClient": false,
+      "targetVersion": "",
+      "targetDeadline": "2026-06-01",
+      "priority": 1,
+      "status": "pending",
+      "createdAt": "2026-05-19T11:30:00Z",
+      "note": ""
+    }
+  ]
+}
