@@ -267,6 +267,7 @@
     <div class="app-container">
       <!-- 复制成功提示 -->
       <div class="copy-toast" v-if="showCopyToast">✓ 已复制到剪贴板</div>
+      <div class="copy-toast" v-if="showSaveToast" style="background:#409eff">✓ 已自动保存</div>
 
       <!-- 提醒横幅 -->
       <div class="reminder-banner" v-if="reminders.length > 0">
@@ -282,17 +283,16 @@
       <!-- 工具栏 -->
       <div class="toolbar">
         <span class="title">📋 福利中心需求排期表</span>
-        <span class="readonly-badge" v-if="!isEditMode">只读模式</span>
-        <el-button v-if="isEditMode" type="primary" @click="showAddDialog = true">
+        <el-button type="primary" @click="showAddDialog = true">
           + 添加需求
         </el-button>
-        <el-button v-if="isEditMode" @click="saveData">
-          💾 保存下载
+        <el-button @click="exportData">
+          📤 导出备份
         </el-button>
-        <el-button v-if="isEditMode" @click="importData">
+        <el-button @click="importData">
           📂 导入数据
         </el-button>
-        <el-button v-if="isEditMode" @click="showConfigDialog = true">
+        <el-button @click="showConfigDialog = true">
           ⚙️ 设置
         </el-button>
       </div>
@@ -698,12 +698,13 @@
     const app = createApp({
       setup() {
         // === 状态 ===
-        const isEditMode = ref(new URLSearchParams(window.location.search).get('edit') === '1');
+        const isEditMode = ref(true);
         const appData = ref({ config: getDefaultConfig(), requirements: [] });
         const showAddDialog = ref(false);
         const showEditDialog = ref(false);
         const showConfigDialog = ref(false);
         const showCopyToast = ref(false);
+        const showSaveToast = ref(false);
         const fileInput = ref(null);
         const newDeadline = ref('');
         const devFilter = ref('all');
@@ -1191,19 +1192,43 @@
         }
 
         // === 数据加载与保存 ===
+        const STORAGE_KEY = 'tapd_schedule_data';
+
         async function loadData() {
+          // 优先从 localStorage 加载
+          const stored = localStorage.getItem(STORAGE_KEY);
+          if (stored) {
+            try {
+              appData.value = JSON.parse(stored);
+              return;
+            } catch (e) { /* fallback to fetch */ }
+          }
+          // 没有 localStorage 数据时从 data.json 加载初始数据
           try {
             const res = await fetch('./data.json');
             if (res.ok) {
               const data = await res.json();
               appData.value = data;
+              // 存入 localStorage
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
             }
           } catch (e) {
             console.log('No data.json found, using empty state');
           }
         }
 
-        function saveData() {
+        // 自动保存到 localStorage
+        let saveTimer = null;
+        function autoSave() {
+          if (saveTimer) clearTimeout(saveTimer);
+          saveTimer = setTimeout(() => {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(appData.value));
+            showSaveToast.value = true;
+            setTimeout(() => { showSaveToast.value = false; }, 1500);
+          }, 500); // 防抖 500ms
+        }
+
+        function exportData() {
           const json = JSON.stringify(appData.value, null, 2);
           const blob = new Blob([json], { type: 'application/json' });
           const url = URL.createObjectURL(blob);
@@ -1212,7 +1237,7 @@
           a.download = 'data.json';
           a.click();
           URL.revokeObjectURL(url);
-          ElMessage.success('data.json 已下载，请替换原文件');
+          ElMessage.success('data.json 备份已下载');
         }
 
         function importData() {
@@ -1303,8 +1328,10 @@
         }
 
         // === 生命周期 ===
+        let isLoaded = false;
         onMounted(async () => {
           await loadData();
+          isLoaded = true;
           nextTick(() => {
             setTimeout(initSortable, 300);
           });
@@ -1314,8 +1341,13 @@
           nextTick(() => setTimeout(initSortable, 100));
         });
 
+        // 自动保存：深度监听 appData 变化
+        watch(appData, () => {
+          if (isLoaded) autoSave();
+        }, { deep: true });
+
         return {
-          isEditMode, appData, showAddDialog, showEditDialog, showConfigDialog, showCopyToast,
+          isEditMode, appData, showAddDialog, showEditDialog, showConfigDialog, showCopyToast, showSaveToast,
           fileInput, newDeadline, devFilter,
           addForm, editForm, configForm,
           reminders, timelineWeeks, computedVersions, futureVersions, futureDeadlines,
@@ -1327,7 +1359,7 @@
           statusLabel, updateStatus,
           editReq, confirmEdit, deleteReq,
           getPhaseForWeek, getPhaseClass,
-          saveData, importData, handleFileImport,
+          exportData, importData, handleFileImport,
           saveConfig, removeDeadline, addDeadline,
           setDevSortRef, setDataSortRef, setDesignSortRef
         };
