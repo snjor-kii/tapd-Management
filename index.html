@@ -196,6 +196,21 @@
       100% { opacity: 0; }
     }
 
+    /* 上报需求标注 */
+    .report-card .report-checks {
+      display: flex; gap: 12px; margin-top: 6px;
+    }
+    .report-check {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 12px; color: #909399; cursor: pointer;
+      padding: 2px 6px; border-radius: 4px; transition: all 0.2s;
+    }
+    .report-check:hover { background: #f5f7fa; }
+    .report-check.checked { color: #67c23a; font-weight: 500; }
+    .report-check input[type="checkbox"] {
+      width: 14px; height: 14px; cursor: pointer; accent-color: #67c23a;
+    }
+
     /* 今日待办清单 */
     .todo-panel {
       background: linear-gradient(135deg, #e8f4fd 0%, #f0f7ff 100%);
@@ -565,7 +580,7 @@
             </div>
             <div>
               <div v-for="(req, idx) in group.items" :key="req.id"
-                   class="req-card"
+                   class="req-card report-card"
                    :data-id="req.id">
                 <span class="seq-num">{{ idx + 1 }}</span>
                 <div class="info">
@@ -574,9 +589,16 @@
                     <span v-else>{{ req.title }}</span>
                   </div>
                   <div class="req-tags">
-                    <span class="mini-tag report">需上报</span>
                     <span v-if="req.needDesign" class="mini-tag design">需设计</span>
                     <span v-if="req.needClient" class="mini-tag client">需客户端</span>
+                  </div>
+                  <div class="report-checks">
+                    <label class="report-check" :class="{ checked: req.reportSubmitted }">
+                      <input type="checkbox" v-model="req.reportSubmitted"> 已提需求单
+                    </label>
+                    <label class="report-check" :class="{ checked: req.reportAligned }">
+                      <input type="checkbox" v-model="req.reportAligned"> 已跟上报老师对过
+                    </label>
                   </div>
                 </div>
                 <div class="actions">
